@@ -1,0 +1,13 @@
+body {
+  font-family: monospace;
+}
+
+#grid {
+  font-size: 16px;
+  line-height: 0px;
+}
+
+.emoji {
+  width: 20px;
+  height: 20px;
+}

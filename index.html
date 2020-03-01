@@ -1,5 +1,5 @@
 <html><head>
-<title>Goof Blocks</title>
+<title>Spooky Chaps</title>
 <meta charset='UTF-8' />
 <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=0"/> <!--320-->
 <link rel="stylesheet" href="page.css">
@@ -10,10 +10,10 @@
 <p id='grid'>hi</p>
 
 <input type="button" style='width:70px; height:60px' value="<-" onclick="pressLeft()" />
-<input type="button" style='width:70px; height:60px' value="turn" onclick="pressSpin()" />
+<input type="button" style='width:70px; height:60px' value="^" onclick="pressSpin()" />
 <input type="button" style='width:70px; height:60px' value="->" onclick="pressRight()" />
 <br>
-<input type="button" style='width:200px; height:60px' value="down" onclick="pressDown()" />
+<input type="button" style='width:200px; height:60px' value="v" onclick="pressDown()" />
 <br><br>
 <input type="button" style='width:200px; height:40px' value="drop" onclick="pressDrop()" />
 <br>
@@ -27,7 +27,7 @@
 <p id="DEBUGTEXT"></p>
 
 <script type="text/javascript" src="game.js"></script>
-<script type="text/javascript" src="debug.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/ChrisLHall/debugjs/debug.js"></script>
 <script type="text/javascript">
   startGame();
 </script>

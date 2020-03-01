@@ -186,7 +186,7 @@ function setupPieces() {
     PIECES = PIECES_BONELESS;
   }
   if (origLoc !== newLoc) {
-    window.location.href = plainHref + newLoc;
+    //window.location.href = plainHref + newLoc;
   }
   if (newLoc !== "?standard") {
     name = newLoc.substring(1,2).toUpperCase() + newLoc.substring(2);
@@ -212,7 +212,7 @@ function startGame() {
   }
   setupPieces();
   loadNextPiece();
-  setTimeout(gameLoop, FRAME_TIME);
+  //setTimeout(gameLoop, FRAME_TIME);
 }
 
 var stopped = false;
@@ -247,7 +247,7 @@ function gameLoop() {
     }
     renderGrid();
   }
-  setTimeout(gameLoop, FRAME_TIME);
+  //setTimeout(gameLoop, FRAME_TIME);
 }
 
 function renderGrid() {
@@ -400,6 +400,7 @@ function pressLeft() {
     piece.col--;
     renderGrid();
   }
+  gameLoop();
 }
 
 function pressRight() {
@@ -408,6 +409,7 @@ function pressRight() {
     piece.col++;
     renderGrid();
   }
+  gameLoop();
 }
 
 function pressSpin() {
@@ -417,6 +419,7 @@ function pressSpin() {
     piece = rot;
   }
   renderGrid();
+  gameLoop();
 }
 
 function pressDown() {
@@ -425,12 +428,14 @@ function pressDown() {
     piece.row++;
     renderGrid();
   }
+  gameLoop();
 }
 
 function pressDrop() {
   if (stopped) return;
   dropPiece();
   renderGrid();
+  gameLoop();
 }
 
 document.onkeydown = checkKey;

@@ -18,6 +18,15 @@ var piece = {
   col: 3,
 }
 
+var you = {
+  gfx: [["✌"]],
+  x: 5,
+  y: 5,
+};
+
+
+var bg = []; // populated in startGame
+
 var nextPieceArr = null;
 
 var PIECES_STANDARD = [
@@ -203,7 +212,24 @@ function loadNextPiece() {
   nextPieceArr = copyTranspose(choose(PIECES));
 }
 
+var FLOOR_TILES = ["▫", "🔲", "⬛"]; // todo
+function generateBG(width, height) {
+  var result = [];
+  for (var r = 0; r < height; r++) {
+    var row = [];
+    for (var c = 0; c < width; c++) {
+      row.push(choose(FLOOR_TILES));
+    }
+    result.push(row);
+  }
+  return result;
+}
+
+
+
+// ENTRY POINT
 function startGame() {
+  bg = generateBG(WIDTH, HEIGHT);
   for (var j = 0; j < HEIGHT; j++) {
     gridArr.push([]);
     for (var k = 0; k < WIDTH; k++) {
@@ -259,7 +285,8 @@ function renderGrid() {
         block = gridArr[j][k];
       }
       if (!block) {
-        block = "▫";
+        block = " ";
+        block = bg[j][k];
       }
       str += block;
     }

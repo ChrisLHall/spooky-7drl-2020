@@ -34,6 +34,20 @@ var bg = []; // populated in startGame
 
 var nextPieceArr = null;
 
+var ROOMS = [
+  [[1,1,0,1,],
+   [1,0,0,0,],
+   [0,0,0,1,],
+   [1,1,1,1,]]
+];
+
+var environment = [];
+var envTemplate = {
+  gfx: [["😍"]],
+  x: 0,
+  y: 0,
+};
+
 var PIECES_STANDARD = [
   [["✈"]],
   
@@ -59,6 +73,11 @@ function choose(arr) {
 
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
+}
+
+// shallow copy
+function copyFromTemplate(obj, template) {
+  Object.assign(obj, template); // test??
 }
 
 // copy this transpose because I laid out the pieces wrong above
@@ -120,6 +139,10 @@ function generateBG(width, height) {
     result.push(row);
   }
   return result;
+}
+
+function generateWalls(width, height) {
+
 }
 
 

@@ -1,8 +1,8 @@
 var grid = document.querySelector('#grid');
-var WIDTH = 11;
-var HEIGHT = 18;
-var CAM_WIDTH = 9;
-var CAM_HEIGHT = 9;
+var WIDTH = 20;
+var HEIGHT = 20;
+var CAM_WIDTH = 15;
+var CAM_HEIGHT = 11;
 var camX = 0;
 var camY = 0;
 
@@ -35,18 +35,16 @@ var bg = []; // populated in startGame
 var nextPieceArr = null;
 
 var ROOMS = [
-  [[1,1,0,1,],
-   [1,0,0,0,],
-   [0,0,0,1,],
-   [1,1,1,1,]]
+  [[1,1,0,1,1,1,],
+   [1,0,0,0,0,1,],
+   [1,0,0,0,0,0,],
+   [0,0,0,0,0,1,],
+   [1,1,1,0,1,1,]]
 ];
 
+var ROOM_WALLS = ["🆘", "➿"];
+
 var environment = [];
-var envTemplate = {
-  gfx: [["😍"]],
-  x: 0,
-  y: 0,
-};
 
 var PIECES_STANDARD = [
   [["✈"]],
@@ -94,30 +92,6 @@ function copyTranspose(arr) {
   return result;
 }
 
-var name = "";
-function setupPieces() {
-  var plainHref = window.location.href;
-  var origLoc = window.location.search;
-  plainHref = plainHref.substring(0, plainHref.length - origLoc.length);
-  var newLoc = "?standard";
-  if (origLoc === "?tetra") {
-    newLoc = origLoc;
-    PIECES = PIECES_TETRA; 
-  } else if (origLoc === "?boxing") {
-    newLoc = origLoc;
-    PIECES = PIECES_BOXING;
-  } else if (origLoc === "?boneless") {
-    newLoc = origLoc;
-    PIECES = PIECES_BONELESS;
-  }
-  if (origLoc !== newLoc) {
-    //window.location.href = plainHref + newLoc;
-  }
-  if (newLoc !== "?standard") {
-    name = newLoc.substring(1,2).toUpperCase() + newLoc.substring(2);
-  }
-}
-
 function loadNextPiece() {
   nextPieceArr = nextPieceArr || copyTranspose(choose(PIECES));
   piece.arr = nextPieceArr
@@ -128,7 +102,7 @@ function loadNextPiece() {
   nextPieceArr = copyTranspose(choose(PIECES));
 }
 
-var FLOOR_TILES = ["▫", "🔲", "⬛"]; // todo
+var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
 function generateBG(width, height) {
   var result = [];
   for (var r = 0; r < height; r++) {
@@ -141,23 +115,57 @@ function generateBG(width, height) {
   return result;
 }
 
+// return an array of objects that are each 1 grid tile
 function generateWalls(width, height) {
+  var result = [];
+  for (var y = 0; y < height; y++) {
+    var row = [];
+    for (var x = 0; x < width; x++) {
+      row.push(null);
+    }
+    result.push(row);
+  }
+  var roomWidth = ROOMS[0][0].length;
+  var roomHeight = ROOMS[0].length;
+  for (var k = 0; k < height / roomHeight; k++) {
+    var startY = 2 + k * (roomHeight - 1);
+    var endY = 2 + (k + 1) * (roomHeight - 1) - 1;
+    if (endY >= height) break;
+    for (var j = 0; j < width / roomWidth; j++) {
+      var startX = 2 + j * (roomWidth - 1);
+      var endX = 2 + (j + 1) * (roomWidth - 1) - 1;
+      if (endX >= width) break;
 
+      var room = choose(ROOMS);
+      var wall = choose(ROOM_WALLS);
+      placeRoom(result, startX, startY, room, wall);
+    }
+  }
+
+  return result;
 }
 
-
+function placeRoom(envArray, xStart, yStart, roomArray, wallTile) {
+  for (var y = 0; y < roomArray.length; y++) {
+    for (var x = 0; x < roomArray[y].length; x++) {
+      var thisTile = roomArray[y][x] === 1 ? wallTile : null;
+      envArray[yStart + y][xStart + x] = thisTile;
+    }
+  }
+}
 
 // ENTRY POINT
 function startGame() {
   bg = generateBG(WIDTH, HEIGHT);
+  environment = generateWalls(WIDTH, HEIGHT);
   for (var j = 0; j < HEIGHT; j++) {
     gridArr.push([]);
     for (var k = 0; k < WIDTH; k++) {
       gridArr[j].push(null);
     }
   }
-  setupPieces();
-  loadNextPiece();
+  //setupPieces();
+  //loadNextPiece();
   //setTimeout(gameLoop, FRAME_TIME);
 }
 
@@ -207,10 +215,9 @@ function renderGrid() {
         block = you.gfx;
       }
       if (!block) {
-        block = maybeRenderPiece(y, x);
+        block = environment[y][x];
       }
       if (!block) {
-        block = " ";
         block = bg[y][x];
       }
       str += block;

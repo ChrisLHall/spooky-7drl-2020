@@ -1,6 +1,11 @@
 var grid = document.querySelector('#grid');
-var WIDTH=11;
-var HEIGHT=18;
+var WIDTH = 11;
+var HEIGHT = 18;
+var CAM_WIDTH = 9;
+var CAM_HEIGHT = 9;
+var camX = 0;
+var camY = 0;
+
 var FRAME_TIME=700;
 var gridArr = [];
 var score = 0;
@@ -31,137 +36,29 @@ var nextPieceArr = null;
 
 var PIECES_STANDARD = [
   [["✈"]],
-  [["🚗","🚗"]],
-  [["🚜","🚜","🚜"]],
-  [["🚚","🚚"],
-  [null,"🚚"]],
-  // 4
-  [["✴","✴","✴","✴"]],
-  [["♥","♥","♥"],
-   ["♥",null,null]],
-  [["♦","♦","♦"],
-   [null,null,"♦"]],
-  [["♠","♠",null],
-   [null,"♠","♠"]],
-  [[null,"♣","♣"],
-   ["♣","♣",null]],
-  [[null,"⛔",null],
-   ["⛔","⛔","⛔"]],
-  [["✖","✖"],
-   ["✖","✖"]],
-  // 5
-  [["🌲","🌲","🌲","🌲","🌲"]],
-  [["🌳","🌳","🌳","🌳"],
-   [null,null,null,"🌳"]],
-  [["🌴","🌴","🌴","🌴"],
-   ["🌴",null,null,null]],
-  [["🌵","🌵","🌵","🌵"],
-   [null,null,"🌵",null]],
-  [["🌿","🌿","🌿","🌿"],
-   [null,"🌿",null,null]],
-  [["🍁","🍁","🍁",null],
-   [null,null,"🍁","🍁"]],
-  [[null,"🍂","🍂","🍂"],
-   ["🍂","🍂",null,null]],
-  [["🍇","🍇","🍇"],
-   ["🍇","🍇",null]],
-  [["🍉","🍉","🍉"],
-   [null,"🍉","🍉"]],
-  [["🍊","🍊","🍊"],
-   ["🍊",null,"🍊"]],
-  [["🍋","🍋","🍋"],
-   [null,"🍋",null],
-   [null,"🍋",null]],
-  [["🍌","🍌","🍌"],
-   ["🍌",null,null],
-   ["🍌",null,null]],
-  [["🍍","🍍",null],
-   [null,"🍍","🍍"],
-   [null,null,"🍍"]],
-  [["🍎","🍎",null],
-   [null,"🍎",null],
-   [null,"🍎","🍎"]],
-  [["🍐",null,null],
-   ["🍐","🍐","🍐"],
-   [null,null,"🍐"]],
-  [["🍑",null,null],
-   ["🍑","🍑","🍑"],
-   [null,"🍑",null]],
-  [[null,null,"🍆"],
-   ["🍆","🍆","🍆"],
-   [null,"🍆",null]],
-  [[null,"🍄",null],
-   ["🍄","🍄","🍄"],
-   [null,"🍄",null]],
+  
 ];
 var PIECES_TETRA = [
   [["❄"]],
-  [["☃","☃"]],
-  [["☁","☁","☁"]],
-  [["⭕","⭕"],
-   [null,"⭕"]],
-  // 4
-  [["⭐","⭐","⭐","⭐"]],
-  [["☄","☄","☄"],
-   ["☄",null,null]],
-  [["❇","❇","❇"],
-   [null,null,"❇"]],
-  [["🌠","🌠",null],
-   [null,"🌠","🌠"]],
-  [[null,"🎆","🎆"],
-   ["🎆","🎆",null]],
-  [[null,"🌙",null],
-   ["🌙","🌙","🌙"]],
-  [["🔥","🔥"],
-   ["🔥","🔥"]],
+  
 ];
 var PIECES_BOXING = [
   [["☮","☮"]],
-  [["♈","♈"],
-   ["♈","♈"]],
-  [["➡","➡","➡"],
-   ["➡","➡","➡"]],
-  [["♉","♉","♉"],
-   ["♉","♉","♉"],
-   ["♉","♉","♉"]],
-  [["⛓","⛓","⛓"],
-   ["⛓",null,"⛓"],
-   ["⛓","⛓","⛓"]],
-  [["♎","♎","♎","♎"],
-   ["♎","♎","♎","♎"]],
-  [["⛔","⛔","⛔","⛔"],
-   ["⛔",null,null,"⛔"],
-   ["⛔",null,null,"⛔"],
-   ["⛔","⛔","⛔","⛔"]],
-  [["🔆","🔆","🔆","🔆"]],
+  
 ];
 var PIECES_BONELESS = [
   [["☠",null,"☠"],
    [null,"☠","☠"]],
-  [["💀",null,"💀"],
-   ["💀","💀",null]],
-  [["👻",null,"👻"],
-   ["👻",null,"👻"]],
-  [["😈",null,"😈","😈","😈"]],
-  [["😱","😱",null,null],
-   [null,null,"😱","😱"]],
-  [[null,null,"😵","😵"],
-   ["😵","😵",null,null]],
-  [["❌",null,null],
-   [null,null,null],
-   ["❌","❌","❌"]],
-  [[null,null,"✖"],
-   [null,null,null],
-   ["✖","✖","✖"]],
-  [[null,null,"👾",null,null],
-   [null,null,null,null,null],
-   ["👾",null,"👾",null,"👾"]],
 ];
 
 var PIECES = PIECES_STANDARD;
 
 function choose(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max);
 }
 
 // copy this transpose because I laid out the pieces wrong above
@@ -243,69 +140,57 @@ function startGame() {
 
 var stopped = false;
 function gameLoop() {
-  if (document.hasFocus()) {
-    if (!stopped) {
-      if (canMovePiece(1, 0)) {
-        piece.row++;
-      } else {
-        commitPiece();
-        loadNextPiece();
-        if (!canMovePiece(0, 0)) {
-          stopped = true;
-        }
+  if (!stopped) {
+    if (canMovePiece(1, 0)) {
+      piece.row++;
+    } else {
+      commitPiece();
+      loadNextPiece();
+      if (!canMovePiece(0, 0)) {
+        stopped = true;
       }
     }
-    if (!stopped) {
-      for (var lines = 0; lines < 5; lines++) {
-        if (!tryClearLine()) break;
-      }
-      if (lines > 0) {
-        score += LINE_POINTS[lines - 1];
-        scoreText = LINE_TEXTS[lines - 1];
-        setTimeout(function () { scoreText = ["",""]; }, 1000);
-        lineCounter += lines;
-        if (lineCounter >= 5) {
-          lineCounter -= 5;
-          level++;
-          FRAME_TIME = Math.floor(FRAME_TIME * .9);
-        }
-      }
-    }
-    renderGrid();
   }
+  if (!stopped) {
+    for (var lines = 0; lines < 5; lines++) {
+      if (!tryClearLine()) break;
+    }
+    if (lines > 0) {
+      score += LINE_POINTS[lines - 1];
+      scoreText = LINE_TEXTS[lines - 1];
+      setTimeout(function () { scoreText = ["",""]; }, 1000);
+      lineCounter += lines;
+      if (lineCounter >= 5) {
+        lineCounter -= 5;
+        level++;
+        FRAME_TIME = Math.floor(FRAME_TIME * .9);
+      }
+    }
+  }
+  renderGrid();
   //setTimeout(gameLoop, FRAME_TIME);
 }
 
 function renderGrid() {
+  camX = clamp(you.x - Math.floor(CAM_WIDTH / 2), 0, WIDTH - CAM_WIDTH);
+  camY = clamp(you.y - Math.floor(CAM_HEIGHT / 2), 0, HEIGHT - CAM_HEIGHT);
   var str = "";
-  for (var j = 0; j < HEIGHT; j++) {
-    for (var k = 0; k < WIDTH; k++) {
-      var block = maybeRenderPiece(j, k);
+  for (var j = 0; j < CAM_HEIGHT; j++) {
+    var y = j + camY;
+    for (var k = 0; k < CAM_WIDTH; k++) {
+      var x = k + camX;
+      var block = null;
+      if (y === you.y && x === you.x) {
+        block = you.gfx;
+      }
       if (!block) {
-        block = gridArr[j][k];
+        block = maybeRenderPiece(y, x);
       }
       if (!block) {
         block = " ";
-        block = bg[j][k];
+        block = bg[y][x];
       }
       str += block;
-    }
-    if (j === 1) {
-      str += "Next:";
-    } else if (j >= 2 && j < 7) {
-      str += renderNextPieceRow(j - 2);
-    } else if (j === 7) {
-      str += "Score:";
-    } else if (j === 8) {
-      str += score;
-    } else if (j === 10) {
-      str += "Level:";
-    } else if (j === 11) {
-      str += level;
-    } else if (j === 13) {
-      str += (stopped ? "Game" : scoreText[0]);
-    } else if (j === 14) {
-      str += (stopped ? "Over." : scoreText[1]);
     }
     str += "<br>";
   }
@@ -423,6 +308,7 @@ function tryClearLine() {
 
 function pressLeft() {
   if (stopped) return;
+  you.x--;
   if (canMovePiece(0, -1)) {
     piece.col--;
     renderGrid();
@@ -432,6 +318,7 @@ function pressLeft() {
 
 function pressRight() {
   if (stopped) return;
+  you.x++;
   if (canMovePiece(0, 1)) {
     piece.col++;
     renderGrid();
@@ -439,8 +326,9 @@ function pressRight() {
   gameLoop();
 }
 
-function pressSpin() {
+function pressUp() {
   if (stopped) return;
+  you.y--;
   var rot = rotatePiece(true);
   if (canMovePiece(0, 0, rot)) {
     piece = rot;
@@ -451,6 +339,7 @@ function pressSpin() {
 
 function pressDown() {
   if (stopped) return;
+  you.y++;
   if (canMovePiece(1, 0)) {
     piece.row++;
     renderGrid();
@@ -472,7 +361,7 @@ function checkKey(e) {
 
   if (e.keyCode == '38') {
     // up arrow
-    pressSpin();
+    pressUp();
   } else if (e.keyCode == '40') {
     // down arrow
     pressDown();

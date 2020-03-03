@@ -7,9 +7,10 @@ var camX = 0;
 var camY = 0;
 
 var you = {
-  gfx: [["✌"]],
+  gfx: "✌",
   x: 5,
   y: 5,
+  hasKey: false,
 };
 
 var bg = []; // populated in startGame
@@ -25,6 +26,19 @@ var ROOM_WALLS = ["🆘", "➿"];
 
 var environment = [];
 
+var entityTemplate = {
+  type: "butts",
+  gfx: [["💤"]],
+  x: 0,
+  y: 0,
+};
+var entities = [];
+var entitiesToDelete = [];
+
+var entityUpdateFunctions = {
+  "key": updateKey,
+};
+
 function choose(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -33,9 +47,13 @@ function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
 }
 
+function randomInt(min, max) {
+  return min + Math.floor(Math.random() * (max - min));
+}
+
 // shallow copy
 function copyFromTemplate(obj, template) {
-  Object.assign(obj, template); // test??
+  return Object.assign(obj, template); // test??
 }
 
 var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
@@ -90,17 +108,57 @@ function placeRoom(envArray, xStart, yStart, roomArray, wallTile) {
   }
 }
 
+function placeKey(entities, xMin, yMin, xMax, yMax) {
+  for (var j = 0; j < 100; j++) {
+    // try to place 10 times
+    var x = randomInt(xMin, xMax);
+    var y = randomInt(yMin, yMax);
+    if (isEmpty(x, y)) {
+      keyObj = copyFromTemplate({}, entityTemplate);
+      keyObj.type = "key";
+      keyObj.gfx = [["🗝"]];
+      keyObj.x = x;
+      keyObj.y = y;
+
+      entities.push(keyObj);
+      break;
+    }
+  }
+}
+
 // ENTRY POINT
 function startGame() {
   bg = generateBG(WIDTH, HEIGHT);
   environment = generateWalls(WIDTH, HEIGHT);
+  entities = [];
+  placeKey(entities, 2, 2, WIDTH - 2, HEIGHT - 2);
+
+  renderGrid();
 }
 
 var stopped = false;
 function gameLoop() {
   if (!stopped) {
   }
-  
+  entitiesToDelete = [];
+
+  // update
+  for (var j = 0; j < entities.length; j++) {
+    var entity = entities[j];
+    if (entity.type in entityUpdateFunctions) {
+      entityUpdateFunctions[entity.type](entity);
+    }
+  }
+
+  // now delete
+  for (var j = 0; j < entitiesToDelete.length; j++) {
+    var entity = entitiesToDelete[j];
+    var index = entities.indexOf(entity);
+    if (-1 !== index) {
+      entities.splice(index, 1);
+    }
+  }
+
   renderGrid();
   //setTimeout(gameLoop, FRAME_TIME);
 }
@@ -108,49 +166,104 @@ function gameLoop() {
 function renderGrid() {
   camX = clamp(you.x - Math.floor(CAM_WIDTH / 2), 0, WIDTH - CAM_WIDTH);
   camY = clamp(you.y - Math.floor(CAM_HEIGHT / 2), 0, HEIGHT - CAM_HEIGHT);
-  var str = "";
+
+  var frame = [];
   for (var j = 0; j < CAM_HEIGHT; j++) {
+    var frameRow = []
     var y = j + camY;
     for (var k = 0; k < CAM_WIDTH; k++) {
       var x = k + camX;
       var block = null;
-      if (y === you.y && x === you.x) {
-        block = you.gfx;
-      }
       if (!block) {
         block = environment[y][x];
       }
       if (!block) {
         block = bg[y][x];
       }
-      str += block;
+      frameRow.push(block);
+    }
+    frame.push(frameRow);
+  }
+
+  // TODO draw YOU and entities
+  for (var idx = 0; idx < entities.length; idx++) {
+    var entity = entities[idx];
+    for (var j = 0; j < entity.gfx.length; j++) {
+      var y = entity.y + j - camY;
+      if (y < 0 || y >= CAM_HEIGHT) continue;
+      for (var k = 0; k < entity.gfx[j].length; k++) {
+        var x = entity.x + k - camX;
+        if (x < 0 || x >= CAM_WIDTH) continue;
+        frame[y][x] = entity.gfx[j][k];
+      }
+    }
+  }
+
+  var playerX = you.x - camX;
+  var playerY = you.y - camY;
+  if (playerX >= 0 && playerX < CAM_WIDTH
+      && playerY >= 0 && playerY < CAM_HEIGHT) {
+    frame[playerY][playerX] = you.gfx;
+  }
+
+  var str = "";
+  for (var j = 0; j < frame.length; j++) {
+    for (var k = 0; k < frame[j].length; k++) {
+      str += frame[j][k];
     }
     str += "<br>";
   }
+  // TODO health?
+  str += "💙💙💙💙💙" + "&nbsp;&nbsp;&nbsp;" + (you.hasKey ? "🗝" : "&nbsp;") + "<br>";
   grid.innerHTML = twemoji.parse(str);
 }
 
+function isEmpty(x, y) {
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return false;
+  if (you.x === x && you.y === y) return false;
+  if (environment[y][x]) return false;
+  return true;
+}
+
+function tryMovePlayer(dx, dy) {
+  if (isEmpty(you.x + dx, you.y + dy)) {
+    you.x += dx;
+    you.y += dy;
+  }
+}
+
+// entity update functions //
+
+function updateKey(key) {
+  if (key.x === you.x && key.y === you.y) {
+    you.hasKey = true;
+    entitiesToDelete.push(key);
+  }
+}
+
+// end entity update functions //
+
 function pressLeft() {
   if (stopped) return;
-  you.x--;
+  tryMovePlayer(-1, 0);
   gameLoop();
 }
 
 function pressRight() {
   if (stopped) return;
-  you.x++;
+  tryMovePlayer(1, 0);
   gameLoop();
 }
 
 function pressUp() {
   if (stopped) return;
-  you.y--;
+  tryMovePlayer(0, -1);
   gameLoop();
 }
 
 function pressDown() {
   if (stopped) return;
-  you.y++;
+  tryMovePlayer(0, 1);
   gameLoop();
 }
 

@@ -407,7 +407,7 @@ function pressDown() {
   gameLoop();
 }
 
-function pressDrop() {
+function pressWait() {
   if (stopped) return;
   // TODO turn into an action button
   gameLoop();

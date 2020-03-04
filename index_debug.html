@@ -17,8 +17,15 @@
 <br><br>
 <input type="button" style='width:200px; height:40px' value="wait" onclick="pressWait()" />
 <br>
+<p><input type="button" value="reload" onclick="window.location.reload(true)" /></p>
 
+<!-- TODO REMOVE this is for debugging on the phone, which pretty much sucks horribly -->
+<input id='evalText' type='text' value='' /><input type="button" value='eval' onclick="var txt = document.getElementById('evalText').value; console.log(txt + ' ==> ' + eval(txt));" />
+<p id="DEBUGTEXT"></p>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/ChrisLHall/debugjs/debug.js"></script>
 <script type="text/javascript" src="game.js"></script>
+<!-- script type="text/javascript" src="debug.js"></script -->
 <script type="text/javascript">
   console.log("starting game");
   startGame();

@@ -12,6 +12,8 @@ var you = {
   y: 5,
   hasKey: false,
 };
+var keyObj = null;
+var exitObj = null;
 
 var bg = []; // populated in startGame
 
@@ -36,6 +38,7 @@ var entities = [];
 var entitiesToDelete = [];
 var entityTypeToGfx = {
   "key": [["🗝"]],
+  "exit": [["🚪"]],
   "rat": [["🐁"]],
   "slime": [["⚛","⚛"],
             ["⚛","⚛"]],
@@ -134,6 +137,25 @@ function placeKey(entities, xMin, yMin, xMax, yMax) {
   }
 }
 
+function placeExit(entities, xMin, yMin, xMax, yMax, minKeyDist) {
+  for (var attempt = 0; attempt < 100; attempt++) {
+    // try to place 100 times
+    var x = randomInt(xMin, xMax);
+    var y = randomInt(yMin, yMax);
+    var keyDist = Math.abs(x - keyObj.x) + Math.abs(y - keyObj.y);
+    if (keyDist > minKeyDist && isEmpty(x, y)) {
+      exitObj = copyFromTemplate({}, entityTemplate);
+      exitObj.type = "exit";
+      exitObj.gfx = entityTypeToGfx["exit"];
+      exitObj.x = x;
+      exitObj.y = y;
+
+      entities.push(exitObj);
+      break;
+    }
+  }
+}
+
 function placeMonsters(entities, count, type) {
   for (var j = 0; j < count; j++) {
     for (var attempt = 0; attempt < 10; attempt++) {
@@ -159,7 +181,8 @@ function startGame() {
   bg = generateBG(WIDTH, HEIGHT);
   environment = generateWalls(WIDTH, HEIGHT);
   entities = [];
-  placeKey(entities, 2, 2, WIDTH - 2, HEIGHT - 2);
+  placeKey(entities, 3, 3, WIDTH - 3, HEIGHT - 3);
+  placeExit(entities, 3, 3, WIDTH - 3, HEIGHT - 3, 10);
   placeMonsters(entities, 15, "rat");
 
   renderGrid();
@@ -266,6 +289,7 @@ function tryMovePlayer(dx, dy) {
 function updateKey(key) {
   if (key.x === you.x && key.y === you.y) {
     you.hasKey = true;
+    keyObj = null;
     entitiesToDelete.push(key);
   }
 }

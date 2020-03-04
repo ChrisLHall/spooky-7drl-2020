@@ -34,9 +34,17 @@ var entityTemplate = {
 };
 var entities = [];
 var entitiesToDelete = [];
-
+var entityTypeToGfx = {
+  "key": [["🗝"]],
+  "rat": [["🐁"]],
+  "slime": [["⚛","⚛"],
+            ["⚛","⚛"]],
+  
+}
+// todo moving+placing big entities
 var entityUpdateFunctions = {
   "key": updateKey,
+  "rat": updateMoveRandom,
 };
 
 function choose(arr) {
@@ -109,19 +117,39 @@ function placeRoom(envArray, xStart, yStart, roomArray, wallTile) {
 }
 
 function placeKey(entities, xMin, yMin, xMax, yMax) {
-  for (var j = 0; j < 100; j++) {
-    // try to place 10 times
+  for (var attempt = 0; attempt < 100; attempt++) {
+    // try to place 100 times
     var x = randomInt(xMin, xMax);
     var y = randomInt(yMin, yMax);
     if (isEmpty(x, y)) {
       keyObj = copyFromTemplate({}, entityTemplate);
       keyObj.type = "key";
-      keyObj.gfx = [["🗝"]];
+      keyObj.gfx = entityTypeToGfx["key"];
       keyObj.x = x;
       keyObj.y = y;
 
       entities.push(keyObj);
       break;
+    }
+  }
+}
+
+function placeMonsters(entities, count, type) {
+  for (var j = 0; j < count; j++) {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      // try to place 10 times
+      var x = randomInt(0, WIDTH);
+      var y = randomInt(0, HEIGHT);
+      if (isEmpty(x, y)) {
+        var monster = copyFromTemplate({}, entityTemplate);
+        monster.type = type;
+        monster.gfx = entityTypeToGfx[type];
+        monster.x = x;
+        monster.y = y;
+  
+        entities.push(monster);
+        break;
+      }
     }
   }
 }
@@ -132,6 +160,7 @@ function startGame() {
   environment = generateWalls(WIDTH, HEIGHT);
   entities = [];
   placeKey(entities, 2, 2, WIDTH - 2, HEIGHT - 2);
+  placeMonsters(entities, 15, "rat");
 
   renderGrid();
 }
@@ -239,6 +268,16 @@ function updateKey(key) {
     you.hasKey = true;
     entitiesToDelete.push(key);
   }
+}
+
+var RANDOM_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]];
+function updateMoveRandom(entity) {
+  var delta = choose(RANDOM_MOVES);
+  if (isEmpty(entity.x + delta[0], entity.y + delta[1])) {
+    entity.x += delta[0];
+    entity.y += delta[1];
+  }
+  // todo maybe hurt player
 }
 
 // end entity update functions //

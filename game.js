@@ -419,18 +419,23 @@ function checkKey(e) {
   e = e || window.event;
 
   if (e.keyCode == '38') {
+    e.preventDefault();
     // up arrow
     pressUp();
   } else if (e.keyCode == '40') {
+    e.preventDefault();
     // down arrow
     pressDown();
   } else if (e.keyCode == '37') {
+    e.preventDefault();
     // left arrow
     pressLeft();
   } else if (e.keyCode == '39') {
+    e.preventDefault();
     // right arrow
     pressRight();
   } else if (e.keyCode == '32') {
+    e.preventDefault();
     // spacebar
     pressDrop();
   }

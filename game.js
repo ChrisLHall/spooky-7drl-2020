@@ -1,6 +1,6 @@
 var grid = document.querySelector('#grid');
-var WIDTH = 20;
-var HEIGHT = 20;
+var WIDTH = 29;
+var HEIGHT = 26;
 var CAM_WIDTH = 15;
 var CAM_HEIGHT = 11;
 var camX = 0;
@@ -9,11 +9,13 @@ var camY = 0;
 var level = 1;
 
 var you = {
-  gfx: "✌",
+  gfx: "X",
   x: 5,
   y: 5,
   health: 5,
   maxHealth: 5,
+  dead: false,
+  justGotHurt: false,
   hasKey: false,
 };
 var keyObj = null;
@@ -22,13 +24,14 @@ var exitObj = null;
 var bg = []; // populated in startGame
 
 var ROOMS = [
-  [[1,1,0,1,1,1,],
-   [1,0,0,0,0,1,],
-   [1,0,0,0,0,0,],
-   [0,0,0,0,0,1,],
-   [1,1,1,0,1,1,]]
+  [[1,1,0,1,1,1,1,1,],
+   [1,0,0,0,0,0,0,1,],
+   [1,0,0,0,0,0,0,0,],
+   [0,0,0,0,0,0,0,1,],
+   [1,0,0,0,0,0,0,1,],
+   [1,1,1,0,1,1,1,1,]]
 ];
-var ROOM_WALLS = ["🆘", "➿"];
+var ROOM_WALLS = ["☸", "➿"];
 
 var environment = [];
 
@@ -37,21 +40,42 @@ var entityTemplate = {
   gfx: [["💤"]],
   x: 0,
   y: 0,
+  isSolid: false,
 };
 var entities = [];
 var entitiesToDelete = [];
-var entityTypeToGfx = {
-  "key": [["🗝"]],
-  "exit": [["🚪"]],
-  "rat": [["🐁"]],
-  "slime": [["⚛","⚛"],
-            ["⚛","⚛"]],
+var entityCustomProperties = {
+  "key": {
+    gfx: [["🗝"]],
+  },
+  "exit": {
+    gfx: [["🚪"]],
+  },
+  "potion": {
+    gfx: [["🧪"]],
+    heal: 1,
+  },
+  "heartContainer": {
+    gfx: [["💖"]],
+  },
+  "rat": {
+    gfx: [["🐁"]],
+    damage: 1,
+    isSolid: true,
+  },
+  "slime": {
+    gfx: [["✳️","✳️"],
+          ["✳️","✳️"]],
+    damage: 2,
+  }
 }
 
 // todo moving+placing big entities
 var entityUpdateFunctions = {
   "key": updateKey,
   "exit": updateExit,
+  "potion": updatePotion,
+  "heartContainer": updateHeartContainer,
   "rat": updateMoveRandom,
   "slime": updateMoveRandom,
 };
@@ -85,6 +109,8 @@ function entityIsHostile(entity) {
   return entity.type === "rat" || entity.type === "slime";
 }
 
+// world generation functions //
+
 var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
 function generateBG(width, height) {
   var result = [];
@@ -111,12 +137,12 @@ function generateWalls(width, height) {
   var roomWidth = ROOMS[0][0].length;
   var roomHeight = ROOMS[0].length;
   for (var k = 0; k < height / roomHeight; k++) {
-    var startY = 2 + k * (roomHeight - 1);
-    var endY = 2 + (k + 1) * (roomHeight - 1) - 1;
+    var startY = k * (roomHeight - 1);
+    var endY = (k + 1) * (roomHeight - 1) - 1;
     if (endY >= height) break;
     for (var j = 0; j < width / roomWidth; j++) {
-      var startX = 2 + j * (roomWidth - 1);
-      var endX = 2 + (j + 1) * (roomWidth - 1) - 1;
+      var startX = j * (roomWidth - 1);
+      var endX = (j + 1) * (roomWidth - 1) - 1;
       if (endX >= width) break;
 
       var room = choose(ROOMS);
@@ -143,12 +169,7 @@ function placeKey(entities, xMin, yMin, xMax, yMax) {
     var x = randomInt(xMin, xMax);
     var y = randomInt(yMin, yMax);
     if (!isWall(x, y)) {
-      keyObj = copyFromTemplate({}, entityTemplate);
-      keyObj.type = "key";
-      keyObj.gfx = entityTypeToGfx["key"];
-      keyObj.x = x;
-      keyObj.y = y;
-
+      keyObj = createEntity("key", x, y);
       entities.push(keyObj);
       break;
     }
@@ -162,25 +183,16 @@ function placeExit(entities, xMin, yMin, xMax, yMax, minKeyDist) {
     var y = randomInt(yMin, yMax);
     var keyDist = Math.abs(x - keyObj.x) + Math.abs(y - keyObj.y);
     if (keyDist > minKeyDist && !isWall(x, y)) {
-      exitObj = copyFromTemplate({}, entityTemplate);
-      exitObj.type = "exit";
-      exitObj.gfx = entityTypeToGfx["exit"];
-      exitObj.x = x;
-      exitObj.y = y;
-
+      exitObj = createEntity("exit", x, y);
       entities.push(exitObj);
       break;
     }
   }
 }
 
-function placeMonsters(entities, count, type) {
+function placeEntities(entities, count, type) {
   for (var j = 0; j < count; j++) {
-    var monster = copyFromTemplate({}, entityTemplate);
-    monster.type = type;
-    monster.gfx = entityTypeToGfx[type];
-    monster.x = 5;
-    monster.y = 5;
+    var monster = createEntity(type, 5, 5);
     var width = entityWidth(monster);
     var height = entityHeight(monster);
     for (var attempt = 0; attempt < 100; attempt++) {
@@ -203,17 +215,28 @@ function buildLevel(level) {
   entities = [];
   placeKey(entities, 3, 3, WIDTH - 3, HEIGHT - 3);
   placeExit(entities, 3, 3, WIDTH - 3, HEIGHT - 3, 10);
-  placeMonsters(entities, 15, "rat");
-  placeMonsters(entities, 2, "slime");
-  you.x = 0;
-  you.y = 0;
+  placeEntities(entities, Math.min(20, 5 + level), "rat");
+  placeEntities(entities, clamp(level - 3, 0, 5), "slime");
+  var placePotion = (level % 3) === 0; // TODO 0
+  if (placePotion) {
+    placeEntities(entities, 1, "potion");
+  }
+  var placeContainer = (level % 10) === 0; // TODO 0
+  if (placeContainer) {
+    placeEntities(entities, 1, "heartContainer");
+  }
+  you.x = 1;
+  you.y = 1;
   // todo place YOU
 }
+
+// end world generation functions //
 
 // ENTRY POINT
 function startGame() {
   buildLevel(1);
 
+  updateYou();
   renderGrid();
 }
 
@@ -239,6 +262,8 @@ function gameLoop() {
       entities.splice(index, 1);
     }
   }
+
+  updateYou();
 
   renderGrid();
   //setTimeout(gameLoop, FRAME_TIME);
@@ -302,6 +327,15 @@ function renderGrid() {
   grid.innerHTML = twemoji.parse(str);
 }
 
+function createEntity(type, x, y) {
+  var result = copyFromTemplate({}, entityTemplate);
+  result.type = type;
+  copyFromTemplate(result, entityCustomProperties[type]);
+  result.x = x;
+  result.y = y;
+  return result;
+}
+
 function isWall(x, y, width, height) {
   width = width || 1;
   height = height || 1;
@@ -322,15 +356,17 @@ function isYou(x, y, width, height) {
   return (you.x >= x && you.x < x + width && you.y >= y && you.y < y + height);
 }
 
-function entitiesAt(x, y, width, height, self) {
+function entitiesAt(x, y, width, height, self, checkIsSolid) {
   var result = [];
   width = width || 1;
   height = height || 1;
   self = self || null;
+  checkIsSolid = checkIsSolid || false;
 
   for (var j = 0; j < entities.length; j++) {
     var entity = entities[j];
     if (entity === self) continue;
+    if (checkIsSolid && !entity.isSolid) continue;
     if (x < entity.x + entityWidth(entity) && entity.x < x + width
         && y < entity.y + entityHeight(entity) && entity.y < y + height) {
       result.push(entity);
@@ -340,9 +376,24 @@ function entitiesAt(x, y, width, height, self) {
 }
 
 function tryMovePlayer(dx, dy) {
-  if (!isWall(you.x + dx, you.y + dy)) {
+  if (you.dead) return;
+  if (!isWall(you.x + dx, you.y + dy)
+      && entitiesAt(you.x + dx, you.y + dy, 1, 1, null, true).length === 0) {
     you.x += dx;
     you.y += dy;
+  }
+}
+
+function affectHealth(delta) {
+  you.health = clamp(you.health + delta, 0, you.maxHealth);
+  if (you.health === 0 && !you.dead) {
+    console.log("you died!");
+    you.dead = true;
+  }
+  if (delta < 0) {
+    you.justGotHurt = true;
+    // todo more blood?
+    bg[you.y][you.x] = "🩸";
   }
 }
 
@@ -365,23 +416,47 @@ function updateExit(exit) {
   }
 }
 
+function updatePotion(potion) {
+  if (isYou(potion.x, potion.y, entityWidth(potion), entityHeight(potion))) {
+    affectHealth(potion.heal);
+    entitiesToDelete.push(potion);
+  }
+}
+
+function updateHeartContainer(heartContainer) {
+  if (isYou(heartContainer.x, heartContainer.y)) {
+    you.maxHealth++;
+    affectHealth(10);
+    entitiesToDelete.push(heartContainer);
+  }
+}
+
 var RANDOM_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]];
 function updateMoveRandom(entity) {
   var delta = choose(RANDOM_MOVES);
   var width = entityWidth(entity);
   var height = entityHeight(entity);
-  if (!isWall(entity.x + delta[0], entity.y + delta[1], width, height)
+  if (isYou(entity.x + delta[0], entity.y + delta[1], width, height)) {
+    affectHealth(-(entity.damage || 0));
+  } else if (!isWall(entity.x + delta[0], entity.y + delta[1], width, height)
       && entitiesAt(entity.x + delta[0], entity.y + delta[1], width, height, entity).length === 0) {
     entity.x += delta[0];
     entity.y += delta[1];
   }
-  // todo maybe hurt player
-  if (isYou(entity.x, entity.y, width, height)) {
-    you.health--; // maybe give player its own update function
-  }
 }
 
 // end entity update functions //
+
+function updateYou() {
+  if (you.dead) {
+    you.gfx = "☠"
+  } else if (you.justGotHurt) {
+    you.gfx = "💔";
+  } else {
+    you.gfx = "🦝";
+  }
+  you.justGotHurt = false;
+}
 
 function pressLeft() {
   if (stopped) return;
@@ -437,6 +512,6 @@ function checkKey(e) {
   } else if (e.keyCode == '32') {
     e.preventDefault();
     // spacebar
-    pressDrop();
+    pressWait();
   }
 }

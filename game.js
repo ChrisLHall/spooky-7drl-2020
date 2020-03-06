@@ -1,6 +1,6 @@
 var grid = document.querySelector('#grid');
-var WIDTH = 29;
-var HEIGHT = 26;
+var levelWidth = 15;
+var levelHeight = 11;
 var CAM_WIDTH = 15;
 var CAM_HEIGHT = 11;
 var camX = 0;
@@ -299,6 +299,21 @@ function doRoomsConnect(room1, room2) {
   return false;
 }
 
+function roomGridToWalls(roomGrid, outSpawnPositions) {
+  var result = [];
+  for (var y = 0; y < roomGrid.length; y++) {
+    var resultRow = [];
+    for (var x = 0; x < roomGrid[y].length; x++) {
+      var tile = roomGrid[y][x];
+      resultRow.push(ROOM_ELEMENT_DICT[tile]);
+      if (tile === " ") {
+        outSpawnPositions.push([x, y]);
+      }
+    }
+    result.push(resultRow);
+  }
+  return result;
+}
 
 // TODO convert the other stuff to use the new system of rooms
 
@@ -327,6 +342,7 @@ function initLightMap(width, height) {
   return result;
 }
 
+/*
 // return an array of objects that are each 1 grid tile
 function generateWalls(width, height) {
   var result = [];
@@ -365,7 +381,14 @@ function placeRoom(envArray, xStart, yStart, roomArray, wallTile) {
     }
   }
 }
+*/
 
+function placeYou(spawnPoints) {
+  var point = choose(spawnPoints);
+  you.x = point[0];
+  you.y = point[1];
+}
+/*
 function placeKey(entities, xMin, yMin, xMax, yMax) {
   for (var attempt = 0; attempt < 100; attempt++) {
     // try to place 100 times
@@ -379,7 +402,7 @@ function placeKey(entities, xMin, yMin, xMax, yMax) {
   }
 }
 
-function placeExit(entities, xMin, yMin, xMax, yMax, minKeyDist) {
+function placeExit(entities, spawnPoints, minKeyDist) {
   for (var attempt = 0; attempt < 100; attempt++) {
     // try to place 100 times
     var x = randomInt(xMin, xMax);
@@ -392,46 +415,75 @@ function placeExit(entities, xMin, yMin, xMax, yMax, minKeyDist) {
     }
   }
 }
+*/
 
-function placeEntities(entities, count, type) {
+function placeEntities(entities, spawnPoints, count, type, avoidPoints, avoidDistance) {
+  avoidPoints = avoidPoints || [];
+  avoidDistance = avoidDistance || 5;
   for (var j = 0; j < count; j++) {
-    var monster = createEntity(type, 5, 5);
-    var width = entityWidth(monster);
-    var height = entityHeight(monster);
-    for (var attempt = 0; attempt < 100; attempt++) {
-      // try to place 10 times
-      var x = randomInt(0, WIDTH);
-      var y = randomInt(0, HEIGHT);
-      if (!isWall(x, y, width, height) && entitiesAt(x, y, width, height).length === 0) {
-        monster.x = x;
-        monster.y = y;
-        break;
-      }
-    }
-    entities.push(monster);
+    placeEntity(entities, spawnPoints, type, avoidPoints, avoidDistance);
   }
 }
 
+function placeEntity(entities, spawnPoints, type, avoidPoints, avoidDistance) {
+  avoidPoints = avoidPoints || [];
+  avoidDistance = avoidDistance || 5;
+  var monster = createEntity(type, 5, 5);
+  var width = entityWidth(monster);
+  var height = entityHeight(monster);
+  for (var attempt = 0; attempt < 100; attempt++) {
+    // try to place 10 times
+    var point = choose(spawnPoints);
+    var x = point[0];
+    var y = point[1];
+    var tooClose = false;
+    for (var avoid = 0; avoid < avoidPoints.length; avoid++) {
+      var avoidPoint = avoidPoints[avoid];
+      var dist = Math.abs(x - avoidPoint[0]) + Math.abs(y - avoidPoint[1]);
+      if (dist < avoidDistance) {
+        tooClose = true;
+        break;
+      }
+    }
+    if (tooClose) continue;
+    if (!isYou(x, y, width, height) && !isWall(x, y, width, height) && entitiesAt(x, y, width, height).length === 0) {
+      monster.x = x;
+      monster.y = y;
+      break;
+    }
+  }
+  entities.push(monster);
+  return monster;
+}
+
 function buildLevel(level) {
-  bg = generateBG(WIDTH, HEIGHT);
-  lightMap = initLightMap(WIDTH, HEIGHT);
-  environment = generateWalls(WIDTH, HEIGHT);
+  var grid = generateRoomGrid(5 + Math.floor(level / 3), newRoomsList);
+  console.log(printRoomGrid(grid));
+  levelWidth = grid[0].length;
+  levelHeight = grid.length;
+  
+  var spawnPoints = [];
+  environment = roomGridToWalls(grid, spawnPoints);
+
+  bg = generateBG(levelWidth, levelHeight);
+  lightMap = initLightMap(levelWidth, levelHeight);
+  
   entities = [];
-  placeKey(entities, 3, 3, WIDTH - 3, HEIGHT - 3);
-  placeExit(entities, 3, 3, WIDTH - 3, HEIGHT - 3, 10);
-  placeEntities(entities, Math.min(20, 5 + level), "rat");
-  placeEntities(entities, clamp(level - 3, 0, 5), "slime");
+  placeYou(spawnPoints);
+  var avoid = [[you.x, you.y]];
+  var key = placeEntity(entities, spawnPoints, "key", avoid, 10);
+  avoid.push([key.x, key.y]);
+  placeEntity(entities, spawnPoints, "exit", avoid, 10);
+  placeEntities(entities, spawnPoints, Math.min(20, 5 + level), "rat");
+  placeEntities(entities, spawnPoints, clamp(level - 3, 0, 5), "slime");
   var placePotion = (level % 3) === 0; // TODO 0
   if (placePotion) {
-    placeEntities(entities, 1, "potion");
+    placeEntity(entities, spawnPoints, "potion");
   }
   var placeContainer = (level % 10) === 0; // TODO 0
   if (placeContainer) {
-    placeEntities(entities, 1, "heartContainer");
+    placeEntity(entities, spawnPoints, "heartContainer");
   }
-  you.x = 1;
-  you.y = 1;
-  // todo place YOU
   
   isDarkLevel = level > 2;
 }
@@ -440,11 +492,6 @@ function buildLevel(level) {
 
 // ENTRY POINT
 function startGame() {
-  // TODO WORK THIS INTO BUILD LEVEL
-  var grid = generateRoomGrid(3, newRoomsList);
-  console.log(printRoomGrid(grid));
-
-  // end todo
   buildLevel(1);
 
   updateYou();
@@ -481,8 +528,8 @@ function gameLoop() {
 }
 
 function renderGrid() {
-  camX = clamp(you.x - Math.floor(CAM_WIDTH / 2), 0, WIDTH - CAM_WIDTH);
-  camY = clamp(you.y - Math.floor(CAM_HEIGHT / 2), 0, HEIGHT - CAM_HEIGHT);
+  camX = clamp(you.x - Math.floor(CAM_WIDTH / 2), 0, levelWidth - CAM_WIDTH);
+  camY = clamp(you.y - Math.floor(CAM_HEIGHT / 2), 0, levelHeight - CAM_HEIGHT);
 
   if (isDarkLevel) {
     clearLightMap();
@@ -595,7 +642,7 @@ function createEntity(type, x, y) {
 function isWall(x, y, width, height) {
   width = width || 1;
   height = height || 1;
-  if (x < 0 || y < 0 || x + width > WIDTH || y + height > HEIGHT) return true;
+  if (x < 0 || y < 0 || x + width > levelWidth || y + height > levelHeight) return true;
 
   for (var j = 0; j < height; j++) {
     for (var k = 0; k < width; k++) {

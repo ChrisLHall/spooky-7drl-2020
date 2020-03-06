@@ -9,7 +9,7 @@ var camY = 0;
 var level = 1;
 var isDarkLevel = true;
 var DARK_TILE = "⬛";
-var DIM_LIGHT = 2;
+var DIM_LIGHT = 4;
 var DIM_FLOOR_TILE = "➗";
 var DIM_ENTITY = "❔";
 
@@ -17,7 +17,7 @@ var you = {
   gfx: "X",
   x: 5,
   y: 5,
-  light: 8,
+  light: 10,
   health: 5,
   maxHealth: 5,
   dead: false,
@@ -43,8 +43,8 @@ var newRoomsList = [
    ["w"," "," "," "," "," ","w"],
    ["d"," "," "," "," "," ","d"],
    ["d"," "," "," "," "," ","d"],
-   ["w"," "," "," "," "," ","w"],
-   ["w","w","d","d","d","w","w"]],
+   ["d"," "," "," "," "," ","w"],
+   ["w","w","d","d","d","d","w"]],
   [["w","d","d","d","w"],
    ["d"," "," "," ","d"],
    ["d"," "," "," ","d"],
@@ -55,6 +55,7 @@ var ROOM_ELEMENT_DICT = {
   " ": null,
   "w": "☸",
   "d": "☸",
+  ".": "🟩",
   "D": null, // floor?
 };
 var ROOM_WALLS = ["☸", "➿"];
@@ -179,7 +180,7 @@ function roomListToGrid(roomList, minWidth, minHeight) {
   for (var r = 0; r < height; r++) {
     var row = [];
     for (var c = 0; c < width; c++) {
-      row.push(" ");
+      row.push("."); // . is background i.e. out of bounds
     }
     result.push(row);
   }
@@ -188,9 +189,9 @@ function roomListToGrid(roomList, minWidth, minHeight) {
     var room = roomList[j];
     // offset everything by -minX, -minY
     for (var r = 0; r < room.layout.length; r++) {
-      var y = r - minY;
+      var y = r - minY + room.y;
       for (var c = 0; c < room.layout[r].length; c++) {
-        var x = c - minX;
+        var x = c - minX + room.x;
         // join the seams between the rooms
         var oldLetter = result[y][x];
         var newLetter = room.layout[r][c];
@@ -207,7 +208,7 @@ function roomListToGrid(roomList, minWidth, minHeight) {
 
 function addRoom(roomList, options) {
   var layout = choose(options);
-  var roomListItem = {
+  var newRoom = {
     layout: layout,
     x: 0,
     y: 0,
@@ -215,8 +216,87 @@ function addRoom(roomList, options) {
     height: layout.length,
   };
 
-  // TODO ACTUALLY PLACE IT SOMEWHERE
-  roomList.push(roomListItem);
+  var foundAPlace = false;
+  // place along the edge of a random room? overlap 1 tile
+  if (roomList.length > 0) {
+    // up to 20 attempts to place
+    for (var attempt = 0; attempt < 20; attempt++) {
+      var otherRoom = choose(roomList);
+      pickRandomPosForRoom(newRoom, otherRoom);
+      if (doRoomsConnect(newRoom, otherRoom) && !doAnyRoomsIntersect(newRoom, roomList)) {
+        foundAPlace = true;
+        break;
+      }
+    }
+  } else {
+    foundAPlace = true; // place at 0, 0
+  }
+
+  if (foundAPlace) {
+    roomList.push(newRoom);
+  }
+}
+
+function pickRandomPosForRoom(newRoom, otherRoom) {
+  var minX = otherRoom.x - newRoom.width + 1;
+  var maxX = otherRoom.x + otherRoom.width - 1;
+  var randomX = randomInt(minX + 2, maxX - 2);
+  var minY = otherRoom.y - newRoom.height + 1;
+  var maxY = otherRoom.y + otherRoom.height - 1;
+  var randomY = randomInt(minY + 2, maxY - 2);
+
+  var rand = Math.random();
+  if (rand < .25) {
+    // left
+    newRoom.x = minX;
+    newRoom.y = randomY;
+  } else if (rand < .5) {
+    // right
+    newRoom.x = maxX;
+    newRoom.y = randomY;
+  } else if (rand < .75) {
+    // up
+    newRoom.x = randomX;
+    newRoom.y = minY;
+  } else {
+    // down
+    newRoom.x = randomX;
+    newRoom.y = maxY;
+  }
+}
+
+function doAnyRoomsIntersect(newRoom, roomList) {
+  for (var j = 0; j < roomList.length; j++) {
+    if (doRoomsIntersect(newRoom, roomList[j])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// check if the inner bits of the room intersect
+function doRoomsIntersect(room1, room2) {
+  return (room1.x + 1) <= (room2.x + room2.width - 1)
+      && (room2.x + 1) <= (room1.x + room1.width - 1)
+      && (room1.y + 1) <= (room2.y + room2.height - 1)
+      && (room2.y + 1) <= (room1.y + room1.height - 1);
+}
+
+function doRoomsConnect(room1, room2) {
+  // get the area of intersection
+  var minX = Math.max(room1.x, room2.x);
+  var maxX = Math.min(room1.x + room1.width, room2.x + room2.width);
+  var minY = Math.max(room1.y, room2.y);
+  var maxY = Math.min(room1.y + room1.height, room2.y + room2.height);
+  for (var y = minY; y < maxY; y++) {
+    for (var x = minX; x < maxX; x++) {
+      if (room1.layout[y - room1.y][x - room1.x] === "d"
+          && room2.layout[y - room2.y][x - room2.x] === "d") {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 

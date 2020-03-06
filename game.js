@@ -7,11 +7,17 @@ var camX = 0;
 var camY = 0;
 
 var level = 1;
+var isDarkLevel = true;
+var DARK_TILE = "⬛";
+var DIM_LIGHT = 2;
+var DIM_FLOOR_TILE = "➗";
+var DIM_ENTITY = "❔";
 
 var you = {
   gfx: "X",
   x: 5,
   y: 5,
+  light: 8,
   health: 5,
   maxHealth: 5,
   dead: false,
@@ -34,6 +40,8 @@ var ROOMS = [
 var ROOM_WALLS = ["☸", "➿"];
 
 var environment = [];
+var lightMap = [];
+// todo more light sources - for now just use you
 
 var entityTemplate = {
   type: "butts",
@@ -118,6 +126,18 @@ function generateBG(width, height) {
     var row = [];
     for (var c = 0; c < width; c++) {
       row.push(choose(FLOOR_TILES));
+    }
+    result.push(row);
+  }
+  return result;
+}
+
+function initLightMap(width, height) {
+  var result = [];
+  for (var r = 0; r < height; r++) {
+    var row = [];
+    for (var c = 0; c < width; c++) {
+      row.push(0);
     }
     result.push(row);
   }
@@ -211,6 +231,7 @@ function placeEntities(entities, count, type) {
 
 function buildLevel(level) {
   bg = generateBG(WIDTH, HEIGHT);
+  lightMap = initLightMap(WIDTH, HEIGHT);
   environment = generateWalls(WIDTH, HEIGHT);
   entities = [];
   placeKey(entities, 3, 3, WIDTH - 3, HEIGHT - 3);
@@ -228,6 +249,8 @@ function buildLevel(level) {
   you.x = 1;
   you.y = 1;
   // todo place YOU
+  
+  isDarkLevel = level > 2;
 }
 
 // end world generation functions //
@@ -273,6 +296,11 @@ function renderGrid() {
   camX = clamp(you.x - Math.floor(CAM_WIDTH / 2), 0, WIDTH - CAM_WIDTH);
   camY = clamp(you.y - Math.floor(CAM_HEIGHT / 2), 0, HEIGHT - CAM_HEIGHT);
 
+  if (isDarkLevel) {
+    clearLightMap();
+    recursivelyLight(you.x, you.y, you.light); // todo more lights
+  }
+
   var frame = [];
   for (var j = 0; j < CAM_HEIGHT; j++) {
     var frameRow = []
@@ -280,11 +308,17 @@ function renderGrid() {
     for (var k = 0; k < CAM_WIDTH; k++) {
       var x = k + camX;
       var block = null;
+      if (!block && isDarkLevel && lightMap[y][x] < 1) {
+        block = DARK_TILE;
+      }
       if (!block) {
         block = environment[y][x];
       }
       if (!block) {
         block = bg[y][x];
+        if (isDarkLevel && lightMap[y][x] <= DIM_LIGHT) {
+          block = DIM_FLOOR_TILE;
+        }
       }
       frameRow.push(block);
     }
@@ -300,6 +334,14 @@ function renderGrid() {
         var x = entity.x + k - camX;
         if (x < 0 || x >= CAM_WIDTH) continue;
         frame[y][x] = entity.gfx[j][k];
+        if (isDarkLevel) {
+          var light = lightMap[y + camY][x + camX];
+          if (light === 0) {
+            frame[y][x] = DARK_TILE;
+          } else if (light <= DIM_LIGHT) {
+            frame[y][x] = DIM_ENTITY;
+          }
+        }
       }
     }
   }
@@ -325,6 +367,32 @@ function renderGrid() {
   }
   str += "Level " + level + "&nbsp;&nbsp;&nbsp;" + healthStr + "&nbsp;&nbsp;&nbsp;" + (you.hasKey ? "🗝" : "&nbsp;") + "<br>";
   grid.innerHTML = twemoji.parse(str);
+}
+
+function clearLightMap() {
+  for (var j = 0; j < lightMap.length; j++) {
+    var row = lightMap[j];
+    for (var k = 0; k < row.length; k++) {
+      row[k] = 0;
+    }
+  }
+}
+
+function recursivelyLight(x, y, light) {
+  if (light <= 0) return;
+  if (x < 0 || y < 0 || x >= lightMap[0].length || y >= lightMap.length) return;
+  if (environment[y][x]) {
+    light = 1;
+  }
+  if (lightMap[y][x] < light) {
+    lightMap[y][x] = light;
+    if (light > 1) {
+      recursivelyLight(x - 1, y, light - 1);
+      recursivelyLight(x + 1, y, light - 1);
+      recursivelyLight(x, y - 1, light - 1);
+      recursivelyLight(x, y + 1, light - 1);
+    }
+  }
 }
 
 function createEntity(type, x, y) {

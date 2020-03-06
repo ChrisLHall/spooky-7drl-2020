@@ -37,6 +37,26 @@ var ROOMS = [
    [1,0,0,0,0,0,0,1,],
    [1,1,1,0,1,1,1,1,]]
 ];
+
+var newRoomsList = [
+  [["w","w","d","d","d","w","w"],
+   ["w"," "," "," "," "," ","w"],
+   ["d"," "," "," "," "," ","d"],
+   ["d"," "," "," "," "," ","d"],
+   ["w"," "," "," "," "," ","w"],
+   ["w","w","d","d","d","w","w"]],
+  [["w","d","d","d","w"],
+   ["d"," "," "," ","d"],
+   ["d"," "," "," ","d"],
+   ["w","d","d","d","w"]],
+];
+// d is maybe door. When they intersect they become D
+var ROOM_ELEMENT_DICT = {
+  " ": null,
+  "w": "☸",
+  "d": "☸",
+  "D": null, // floor?
+};
 var ROOM_WALLS = ["☸", "➿"];
 
 var environment = [];
@@ -118,6 +138,89 @@ function entityIsHostile(entity) {
 }
 
 // world generation functions //
+
+function generateRoomGrid(numRooms, options) {
+  // TODO
+  var roomList = [];
+  for (var j = 0; j < numRooms; j++) {
+    addRoom(roomList, options);
+  }
+
+  return roomListToGrid(roomList, CAM_WIDTH, CAM_HEIGHT);
+}
+
+function printRoomGrid(roomGrid) {
+  var result = ""
+  for (var r = 0; r < roomGrid.length; r++) {
+    for (var c = 0; c < roomGrid[r].length; c++) {
+      result += roomGrid[r][c];
+    }
+    result += "\n";
+  }
+  return result;
+}
+
+function roomListToGrid(roomList, minWidth, minHeight) {
+  var minX = 0;
+  var maxX = 0;
+  var minY = 0;
+  var maxY = 0;
+  for (var j = 0; j < roomList.length; j++) {
+    var room = roomList[j];
+    minX = Math.min(minX, room.x);
+    minY = Math.min(minY, room.y);
+    maxX = Math.max(maxX, room.x + room.width);
+    maxY = Math.max(maxY, room.y + room.height);
+  }
+  var width = Math.max(maxX - minX, minWidth);
+  var height = Math.max(maxY - minY, minHeight);
+
+  var result = [];
+  for (var r = 0; r < height; r++) {
+    var row = [];
+    for (var c = 0; c < width; c++) {
+      row.push(" ");
+    }
+    result.push(row);
+  }
+
+  for (var j = 0; j < roomList.length; j++) {
+    var room = roomList[j];
+    // offset everything by -minX, -minY
+    for (var r = 0; r < room.layout.length; r++) {
+      var y = r - minY;
+      for (var c = 0; c < room.layout[r].length; c++) {
+        var x = c - minX;
+        // join the seams between the rooms
+        var oldLetter = result[y][x];
+        var newLetter = room.layout[r][c];
+        if ((oldLetter === "D" || oldLetter === "d") && newLetter === "d") {
+          newLetter = "D"; // D is when two edges join to make a door
+        }
+        result[y][x] = newLetter; // do I want to overwrite space?
+      }
+    }
+  }
+
+  return result;
+}
+
+function addRoom(roomList, options) {
+  var layout = choose(options);
+  var roomListItem = {
+    layout: layout,
+    x: 0,
+    y: 0,
+    width: layout[0].length,
+    height: layout.length,
+  };
+
+  // TODO ACTUALLY PLACE IT SOMEWHERE
+  roomList.push(roomListItem);
+}
+
+
+// TODO convert the other stuff to use the new system of rooms
 
 var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
 function generateBG(width, height) {
@@ -257,6 +360,11 @@ function buildLevel(level) {
 
 // ENTRY POINT
 function startGame() {
+  // TODO WORK THIS INTO BUILD LEVEL
+  var grid = generateRoomGrid(3, newRoomsList);
+  console.log(printRoomGrid(grid));
+
+  // end todo
   buildLevel(1);
 
   updateYou();

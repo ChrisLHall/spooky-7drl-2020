@@ -95,8 +95,8 @@ var ROOMS = [
 // d is maybe door. When they intersect they become D
 var ROOM_ELEMENT_DICT = {
   " ": null,
-  "w": "☸",
-  "d": "☸",
+  "w": "➿",
+  "d": "➿",
   ".": "🟩",
   "D": null, // floor?
 };
@@ -137,12 +137,16 @@ var entityCustomProperties = {
   "slime": {
     gfx: [["✳️","✳️"],
           ["✳️","✳️"]],
-    damage: 2,
+    damage: 1,
   },
   "dire rat": {
     gfx: [["🐀"]],
     damage: 1,
-  }
+  },
+  "ghost": {
+    gfx: [["👻"]],
+    damage: 2,
+  },
 }
 
 // todo moving+placing big entities
@@ -154,7 +158,30 @@ var entityUpdateFunctions = {
   "rat": updateMoveRandom,
   "slime": updateMoveRandom,
   "dire rat": updateChaseAtCloseRange,
+  "ghost": timerUpdateFunction(updateGhostMoveTowardsYou, 3),
 };
+
+var entityCountFunctions = {
+  "potion": function(level) {
+    return ((level % 3) === 0) ? 1 : 0;
+  },
+  "heart container": function(level) {
+    return ((level % 10) === 0) ? 1 : 0;
+  },
+  "rat": function(level) {
+    return 2 + Math.floor(level / 3);
+  },
+  "slime": function(level) {
+    return (level % 4 === 2) ? Math.floor(level / 5) : 0;
+  },
+  "dire rat": function(level) {
+    return Math.floor(level / 5);
+  },
+  "ghost": function(level) {
+    if (level < 7) return 0;
+    return (Math.random() < 0.3) ? Math.ceil((level - 6) / 5) : 0;
+  },
+}
 
 function choose(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
@@ -362,7 +389,7 @@ function roomGridToWalls(roomGrid, outSpawnPositions) {
   return result;
 }
 
-var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
+var FLOOR_TILES = ["▫"]; // ["▫", "⬜", "⚪"]; // todo
 function generateBG(width, height) {
   var result = [];
   for (var r = 0; r < height; r++) {
@@ -450,17 +477,12 @@ function buildLevel(level) {
   var key = placeEntity(entities, spawnPoints, "key", avoid, 10);
   avoid.push([key.x, key.y]);
   placeEntity(entities, spawnPoints, "exit", avoid, 10);
-  placeEntities(entities, spawnPoints, Math.min(20, 5 + level), "rat");
-  placeEntities(entities, spawnPoints, clamp(level - 3, 0, 5), "slime");
-  // TODO PLACEMENT OF DIRE RATS
-  placeEntity(entities, spawnPoints, "dire rat");
-  var placePotion = (level % 3) === 0; // TODO 0
-  if (placePotion) {
-    placeEntity(entities, spawnPoints, "potion");
-  }
-  var placeContainer = (level % 10) === 0; // TODO 0
-  if (placeContainer) {
-    placeEntity(entities, spawnPoints, "heart container");
+
+  var monsters = Object.keys(entityCountFunctions);
+  avoid = [[you.x, you.y]];
+  for (var j = 0; j < monsters.length; j++) {
+    var monster = monsters[j];
+    placeEntities(entities, spawnPoints, entityCountFunctions[monster](level), monster, avoid, 5);
   }
   
   isDarkLevel = level > 2;
@@ -738,7 +760,7 @@ function updateMoveRandom(entity) {
 
 var CLOSE_DIST = 6;
 function updateChaseAtCloseRange(entity) {
-  if (Math.random() < .2) return;
+  if (Math.random() < .4) return;
   var entityDist = Math.abs(entity.x - you.x) + Math.abs(entity.y - you.y);
   if (entityDist <= CLOSE_DIST) {
     updateMoveTowardsYou(entity);
@@ -760,6 +782,39 @@ function updateMoveTowardsYou(entity) {
   } else {
     var dy = clamp(delta[1], -1, 1);
     tryMoveEntity(entity, 0, dy, true);
+  }
+}
+
+function timerUpdateFunction(updateFunc, time) {
+  var counter = 0;
+  var result = function(entity) {
+    counter++;
+    if (counter >= time) {
+      counter = 0;
+      updateFunc(entity);
+    }
+  }
+  return result;
+}
+
+function updateGhostMoveTowardsYou(entity) {
+  var delta = [you.x - entity.x, you.y - entity.y];
+  if (delta[0] === 0 && delta[1] === 0) {
+    // try hurt player
+    tryMoveEntity(entity, 0, 0, true);
+  } else {
+    var chanceMoveX = Math.abs(delta[0]) / (Math.abs(delta[0]) + Math.abs(delta[1]));
+    if (Math.random() < chanceMoveX) {
+      delta[0] = clamp(delta[0], -1, 1);
+      delta[1] = 0;
+    } else {
+      delta[0] = 0;
+      delta[1] = clamp(delta[1], -1, 1);
+    }
+    entity.x += delta[0];
+    entity.y += delta[1];
+    // try hurt player
+    tryMoveEntity(entity, 0, 0, true);
   }
 }
 

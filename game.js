@@ -176,7 +176,7 @@ var entityCountFunctions = {
     return 1;
   },
   "potion": function(level) {
-    return ((level % 3) === 0) ? 1 : 0;
+    return (level > 3 && (level % 3) === 1) ? 1 : 0;
   },
   "heart container": function(level) {
     return ((level % 10) === 0) ? 1 : 0;
@@ -839,6 +839,24 @@ function updateGhostMoveTowardsYou(entity) {
     entity.y += delta[1];
     // try hurt player
     tryMoveEntity(entity, 0, 0, true);
+  }
+}
+
+function updateWallBreaker(entity) {
+  entity.mad = entity.mad || false;
+  entity.madCooldown = entity.madCooldown || 0;
+  entity.gfx = entity.mad
+    ? [["😡","😡"],
+       ["😡","😡"]]
+    : [["🗿","🗿"],
+       ["🗿","🗿"]];
+  
+  var width = entityWidth(entity);
+  var height = entityHeight(entity);
+  if (entity.mad) {
+  
+  } else {
+    entity.madCooldown--;
   }
 }
 

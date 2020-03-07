@@ -23,6 +23,7 @@ var you = {
   dead: false,
   justGotHurt: false,
   hasKey: false,
+  collected: 0,
 };
 var keyObj = null;
 var exitObj = null;
@@ -97,7 +98,7 @@ var ROOM_ELEMENT_DICT = {
   " ": null,
   "w": "➿",
   "d": "➿",
-  ".": "🟩",
+  ".": "💠",
   "D": null, // floor?
 };
 var ROOM_WALLS = ["☸", "➿"];
@@ -121,6 +122,9 @@ var entityCustomProperties = {
   },
   "exit": {
     gfx: [["🚪"]],
+  },
+  "collect": {
+    gfx: [["📒"]],
   },
   "potion": {
     gfx: [["🧪"]],
@@ -147,12 +151,18 @@ var entityCustomProperties = {
     gfx: [["👻"]],
     damage: 2,
   },
+  "wall breaker": {
+    gfx: [["🗿","🗿"],
+          ["🗿","🗿"]],
+    damage: 2,
+  }
 }
 
 // todo moving+placing big entities
 var entityUpdateFunctions = {
   "key": updateKey,
   "exit": updateExit,
+  "collect": updateCollect,
   "potion": updatePotion,
   "heart container": updateHeartContainer,
   "rat": updateMoveRandom,
@@ -162,6 +172,9 @@ var entityUpdateFunctions = {
 };
 
 var entityCountFunctions = {
+  "collect": function(level) {
+    return 1;
+  },
   "potion": function(level) {
     return ((level % 3) === 0) ? 1 : 0;
   },
@@ -599,7 +612,11 @@ function renderGrid() {
   for (var j = 0; j < you.maxHealth; j++) {
     healthStr += you.health > j ? "💙" : "🖤";
   }
-  str += "Level " + level + "&nbsp;&nbsp;&nbsp;" + healthStr + "&nbsp;&nbsp;&nbsp;" + (you.hasKey ? "🗝" : "&nbsp;") + "<br>";
+  str += "Level " + level + "&nbsp;&nbsp;" + healthStr + "&nbsp;&nbsp;" + (you.hasKey ? "🗝" : "&nbsp;");
+  if (you.collected > 0) {
+    str += "&nbsp;&nbsp;" + entityCustomProperties["collect"].gfx[0][0] + you.collected;
+  }
+  str += "<br>";
   grid.innerHTML = twemoji.parse(str);
 }
 
@@ -729,6 +746,13 @@ function updateExit(exit) {
     you.hasKey = false;
     level++;
     buildLevel(level);
+  }
+}
+
+function updateCollect(collect) {
+  if (isYou(collect.x, collect.y)) {
+    you.collected++;
+    entitiesToDelete.push(collect);
   }
 }
 

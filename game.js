@@ -17,7 +17,7 @@ var you = {
   gfx: "X",
   x: 5,
   y: 5,
-  light: 10,
+  light: 11,
   health: 5,
   maxHealth: 5,
   dead: false,
@@ -81,6 +81,16 @@ var ROOMS = [
    ["d"," "," "," ","w"," "," "," ","d"],
    ["d"," "," "," "," "," "," "," ","w"],
    ["w","w","w","d","d","d","d","d","w"]],
+   [["w","d","d","d","d","d","d","d","w"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["d"," "," "," "," "," "," "," ","d"],
+    ["w","d","d","d","d","d","d","d","w"]],
 ];
 // d is maybe door. When they intersect they become D
 var ROOM_ELEMENT_DICT = {
@@ -116,7 +126,7 @@ var entityCustomProperties = {
     gfx: [["🧪"]],
     heal: 1,
   },
-  "heartContainer": {
+  "heart container": {
     gfx: [["💖"]],
   },
   "rat": {
@@ -128,6 +138,10 @@ var entityCustomProperties = {
     gfx: [["✳️","✳️"],
           ["✳️","✳️"]],
     damage: 2,
+  },
+  "dire rat": {
+    gfx: [["🐀"]],
+    damage: 1,
   }
 }
 
@@ -136,9 +150,10 @@ var entityUpdateFunctions = {
   "key": updateKey,
   "exit": updateExit,
   "potion": updatePotion,
-  "heartContainer": updateHeartContainer,
+  "heart container": updateHeartContainer,
   "rat": updateMoveRandom,
   "slime": updateMoveRandom,
+  "dire rat": updateChaseAtCloseRange,
 };
 
 function choose(arr) {
@@ -347,8 +362,6 @@ function roomGridToWalls(roomGrid, outSpawnPositions) {
   return result;
 }
 
-// TODO convert the other stuff to use the new system of rooms
-
 var FLOOR_TILES = ["▫", "⬜", "⚪"]; // todo
 function generateBG(width, height) {
   var result = [];
@@ -374,80 +387,11 @@ function initLightMap(width, height) {
   return result;
 }
 
-/*
-// return an array of objects that are each 1 grid tile
-function generateWalls(width, height) {
-  var result = [];
-  for (var y = 0; y < height; y++) {
-    var row = [];
-    for (var x = 0; x < width; x++) {
-      row.push(null);
-    }
-    result.push(row);
-  }
-  var roomWidth = ROOMS[0][0].length;
-  var roomHeight = ROOMS[0].length;
-  for (var k = 0; k < height / roomHeight; k++) {
-    var startY = k * (roomHeight - 1);
-    var endY = (k + 1) * (roomHeight - 1) - 1;
-    if (endY >= height) break;
-    for (var j = 0; j < width / roomWidth; j++) {
-      var startX = j * (roomWidth - 1);
-      var endX = (j + 1) * (roomWidth - 1) - 1;
-      if (endX >= width) break;
-
-      var room = choose(ROOMS);
-      var wall = choose(ROOM_WALLS);
-      placeRoom(result, startX, startY, room, wall);
-    }
-  }
-
-  return result;
-}
-
-function placeRoom(envArray, xStart, yStart, roomArray, wallTile) {
-  for (var y = 0; y < roomArray.length; y++) {
-    for (var x = 0; x < roomArray[y].length; x++) {
-      var thisTile = roomArray[y][x] === 1 ? wallTile : null;
-      envArray[yStart + y][xStart + x] = thisTile;
-    }
-  }
-}
-*/
-
 function placeYou(spawnPoints) {
   var point = choose(spawnPoints);
   you.x = point[0];
   you.y = point[1];
 }
-/*
-function placeKey(entities, xMin, yMin, xMax, yMax) {
-  for (var attempt = 0; attempt < 100; attempt++) {
-    // try to place 100 times
-    var x = randomInt(xMin, xMax);
-    var y = randomInt(yMin, yMax);
-    if (!isWall(x, y)) {
-      keyObj = createEntity("key", x, y);
-      entities.push(keyObj);
-      break;
-    }
-  }
-}
-
-function placeExit(entities, spawnPoints, minKeyDist) {
-  for (var attempt = 0; attempt < 100; attempt++) {
-    // try to place 100 times
-    var x = randomInt(xMin, xMax);
-    var y = randomInt(yMin, yMax);
-    var keyDist = Math.abs(x - keyObj.x) + Math.abs(y - keyObj.y);
-    if (keyDist > minKeyDist && !isWall(x, y)) {
-      exitObj = createEntity("exit", x, y);
-      entities.push(exitObj);
-      break;
-    }
-  }
-}
-*/
 
 function placeEntities(entities, spawnPoints, count, type, avoidPoints, avoidDistance) {
   avoidPoints = avoidPoints || [];
@@ -490,7 +434,7 @@ function placeEntity(entities, spawnPoints, type, avoidPoints, avoidDistance) {
 
 function buildLevel(level) {
   var grid = generateRoomGrid(5 + Math.floor(level / 3), ROOMS);
-  console.log(printRoomGrid(grid));
+  //console.log(printRoomGrid(grid));
   levelWidth = grid[0].length;
   levelHeight = grid.length;
   
@@ -508,13 +452,15 @@ function buildLevel(level) {
   placeEntity(entities, spawnPoints, "exit", avoid, 10);
   placeEntities(entities, spawnPoints, Math.min(20, 5 + level), "rat");
   placeEntities(entities, spawnPoints, clamp(level - 3, 0, 5), "slime");
+  // TODO PLACEMENT OF DIRE RATS
+  placeEntity(entities, spawnPoints, "dire rat");
   var placePotion = (level % 3) === 0; // TODO 0
   if (placePotion) {
     placeEntity(entities, spawnPoints, "potion");
   }
   var placeContainer = (level % 10) === 0; // TODO 0
   if (placeContainer) {
-    placeEntity(entities, spawnPoints, "heartContainer");
+    placeEntity(entities, spawnPoints, "heart container");
   }
   
   isDarkLevel = level > 2;
@@ -556,7 +502,6 @@ function gameLoop() {
   updateYou();
 
   renderGrid();
-  //setTimeout(gameLoop, FRAME_TIME);
 }
 
 function renderGrid() {
@@ -627,7 +572,7 @@ function renderGrid() {
     }
     str += "<br>";
   }
-  // TODO health?
+  
   var healthStr = "";
   for (var j = 0; j < you.maxHealth; j++) {
     healthStr += you.health > j ? "💙" : "🖤";
@@ -732,6 +677,20 @@ function affectHealth(delta) {
   }
 }
 
+function tryMoveEntity(entity, dx, dy, dealDamage) {
+  var width = entityWidth(entity);
+  var height = entityHeight(entity);
+  if (isYou(entity.x + dx, entity.y + dy, width, height)) {
+    if (dealDamage) {
+      affectHealth(-(entity.damage || 0));
+    }
+  } else if (!isWall(entity.x + dx, entity.y + dy, width, height)
+      && entitiesAt(entity.x + dx, entity.y + dy, width, height, entity).length === 0) {
+    entity.x += dx;
+    entity.y += dy;
+  }
+}
+
 // entity update functions //
 
 function updateKey(key) {
@@ -766,17 +725,41 @@ function updateHeartContainer(heartContainer) {
   }
 }
 
-var RANDOM_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]];
+function updateMoveRandomOrIdle(entity) {
+  if (Math.random() < .2) return;
+  updateMoveRandom(entity);
+}
+
+var RANDOM_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function updateMoveRandom(entity) {
   var delta = choose(RANDOM_MOVES);
-  var width = entityWidth(entity);
-  var height = entityHeight(entity);
-  if (isYou(entity.x + delta[0], entity.y + delta[1], width, height)) {
-    affectHealth(-(entity.damage || 0));
-  } else if (!isWall(entity.x + delta[0], entity.y + delta[1], width, height)
-      && entitiesAt(entity.x + delta[0], entity.y + delta[1], width, height, entity).length === 0) {
-    entity.x += delta[0];
-    entity.y += delta[1];
+  tryMoveEntity(entity, delta[0], delta[1], true);
+}
+
+var CLOSE_DIST = 6;
+function updateChaseAtCloseRange(entity) {
+  if (Math.random() < .2) return;
+  var entityDist = Math.abs(entity.x - you.x) + Math.abs(entity.y - you.y);
+  if (entityDist <= CLOSE_DIST) {
+    updateMoveTowardsYou(entity);
+  } else {
+    updateMoveRandom(entity);
+  }
+}
+
+function updateMoveTowardsYou(entity) {
+  var delta = [you.x - entity.x, you.y - entity.y];
+  if (delta[0] === 0 && delta[1] === 0) {
+    tryMoveEntity(entity, 0, 0, true);
+    return;
+  }
+  var chanceMoveX = Math.abs(delta[0]) / (Math.abs(delta[0]) + Math.abs(delta[1]));
+  if (Math.random() < chanceMoveX) {
+    var dx = clamp(delta[0], -1, 1);
+    tryMoveEntity(entity, dx, 0, true);
+  } else {
+    var dy = clamp(delta[1], -1, 1);
+    tryMoveEntity(entity, 0, dy, true);
   }
 }
 

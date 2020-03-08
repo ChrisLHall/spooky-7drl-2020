@@ -146,6 +146,7 @@ var entityCustomProperties = {
   "dire rat": {
     gfx: [["🐀"]],
     damage: 1,
+    isSolid: true,
   },
   "ghost": {
     gfx: [["👻"]],
@@ -155,10 +156,19 @@ var entityCustomProperties = {
     gfx: [["🗿","🗿"],
           ["🗿","🗿"]],
     damage: 2,
-  }
+    isSolid: true,
+  },
+  "spider": {
+    gfx: [["🕷"]],
+    damage: 1,
+    isSolid: true,
+  },
+  "spider web": {
+    gfx: [["🕸"]],
+    isSolid: true,
+  },
 }
 
-// todo moving+placing big entities
 var entityUpdateFunctions = {
   "key": updateKey,
   "exit": updateExit,
@@ -169,6 +179,7 @@ var entityUpdateFunctions = {
   "slime": updateSlime,
   "dire rat": updateChaseAtCloseRange,
   "ghost": timerUpdateFunction(updateGhostMoveTowardsYou, 3),
+  "spider": updateSpider,
   "wall breaker": updateWallBreaker,
 };
 
@@ -194,6 +205,9 @@ var entityCountFunctions = {
   "ghost": function(level) {
     if (level < 7) return 0;
     return (Math.random() < 0.3) ? Math.ceil((level - 6) / 5) : 0;
+  },
+  "spider": function(level) {
+    return (level > 8 && level % 2 === 1) ? Math.floor((level - 8) / 2) : 0;
   },
   "wall breaker": function(level) {
     var result = 0;
@@ -236,7 +250,6 @@ function entityIsHostile(entity) {
 // world generation functions //
 
 function generateRoomGrid(numRooms, options) {
-  // TODO
   var roomList = [];
   for (var j = 0; j < numRooms; j++) {
     addRoom(roomList, options);
@@ -410,7 +423,7 @@ function roomGridToWalls(roomGrid, outSpawnPositions) {
   return result;
 }
 
-var FLOOR_TILES = ["▫"]; // ["▫", "⬜", "⚪"]; // todo
+var FLOOR_TILES = ["▫"];
 function generateBG(width, height) {
   var result = [];
   for (var r = 0; r < height; r++) {
@@ -523,7 +536,6 @@ var stopped = false;
 function gameLoop() {
   if (!stopped) {
   }
-  entitiesToDelete = [];
 
   // update
   for (var j = 0; j < entities.length; j++) {
@@ -532,6 +544,7 @@ function gameLoop() {
       entityUpdateFunctions[entity.type](entity);
     }
   }
+  updateYou();
 
   // now delete
   for (var j = 0; j < entitiesToDelete.length; j++) {
@@ -541,8 +554,7 @@ function gameLoop() {
       entities.splice(index, 1);
     }
   }
-
-  updateYou();
+  entitiesToDelete = [];
 
   renderGrid();
 }
@@ -710,11 +722,19 @@ function entitiesAt(x, y, width, height, self, checkIsSolid) {
 
 function tryMovePlayer(dx, dy) {
   if (you.dead) return false;
+  var entitiesInTheWay = entitiesAt(you.x + dx, you.y + dy, 1, 1, null, true);
   if (!isWall(you.x + dx, you.y + dy)
-      && entitiesAt(you.x + dx, you.y + dy, 1, 1, null, true).length === 0) {
+      && entitiesInTheWay.length === 0) {
     you.x += dx;
     you.y += dy;
     return true;
+  }
+  // SPECIAL CASE FOR CLEARING SPIDER WEBS
+  for (var j = 0; j < entitiesInTheWay.length; j++) {
+    var entity = entitiesInTheWay[j];
+    if (entity.type === "spider web") {
+      entitiesToDelete.push(entity);
+    }
   }
   return false;
 }
@@ -727,7 +747,6 @@ function affectHealth(delta) {
   }
   if (delta < 0) {
     you.justGotHurt = true;
-    // todo more blood?
     bg[you.y][you.x] = "🩸";
   }
 }
@@ -866,6 +885,27 @@ function updateGhostMoveTowardsYou(entity) {
   }
 }
 
+function updateSpider(entity) {
+  var origX = entity.x;
+  var origY = entity.y;
+  // assume width and height 1
+  if (Math.random() < .6) {
+    var delta = choose(RANDOM_MOVES);
+    var moved = tryMoveEntity(entity, delta[0], delta[1], true);
+    if (moved && Math.random() < .6) {
+      var newDelta = choose(RANDOM_MOVES);
+      // don't just move backwards
+      if (newDelta[0] !== -delta[0] || newDelta[1] !== -delta[1]) {
+        tryMoveEntity(entity, newDelta[0], newDelta[1], true);
+      }
+    }
+  }
+  if (Math.random() < .1 && entitiesAt(origX, origY, 1, 1).length === 0) {
+    var web = createEntity("spider web", origX, origY);
+    entities.push(web);
+  }
+}
+
 var WALL_BREAKER_COOLDOWN = 12;
 function updateWallBreaker(entity) {
   entity.mad = entity.mad || false;
@@ -985,7 +1025,6 @@ function pressDown() {
 
 function pressWait() {
   if (stopped) return;
-  // TODO turn into an action button
   gameLoop();
 }
 

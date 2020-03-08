@@ -166,9 +166,10 @@ var entityUpdateFunctions = {
   "potion": updatePotion,
   "heart container": updateHeartContainer,
   "rat": updateMoveRandom,
-  "slime": updateMoveRandom,
+  "slime": updateSlime,
   "dire rat": updateChaseAtCloseRange,
   "ghost": timerUpdateFunction(updateGhostMoveTowardsYou, 3),
+  "wall breaker": updateWallBreaker,
 };
 
 var entityCountFunctions = {
@@ -193,6 +194,13 @@ var entityCountFunctions = {
   "ghost": function(level) {
     if (level < 7) return 0;
     return (Math.random() < 0.3) ? Math.ceil((level - 6) / 5) : 0;
+  },
+  "wall breaker": function(level) {
+    var result = 0;
+    for (var j = 0; j < Math.floor(level / 12); j++) {
+      result += Math.random() < .5 ? 1 : 0;
+    }
+    return result;
   },
 }
 
@@ -447,7 +455,7 @@ function placeEntity(entities, spawnPoints, type, avoidPoints, avoidDistance) {
   var monster = createEntity(type, 5, 5);
   var width = entityWidth(monster);
   var height = entityHeight(monster);
-  for (var attempt = 0; attempt < 100; attempt++) {
+  for (var attempt = 0; attempt < 1000; attempt++) {
     // try to place 10 times
     var point = choose(spawnPoints);
     var x = point[0];
@@ -655,10 +663,16 @@ function createEntity(type, x, y) {
   return result;
 }
 
+function isBorder(x, y, width, height) {
+  width = width || 1;
+  height = height || 1;
+  return (x < 0 || y < 0 || x + width > levelWidth || y + height > levelHeight);
+}
+
 function isWall(x, y, width, height) {
   width = width || 1;
   height = height || 1;
-  if (x < 0 || y < 0 || x + width > levelWidth || y + height > levelHeight) return true;
+  if (isBorder(x, y, width, height)) return true;
 
   for (var j = 0; j < height; j++) {
     for (var k = 0; k < width; k++) {
@@ -695,12 +709,14 @@ function entitiesAt(x, y, width, height, self, checkIsSolid) {
 }
 
 function tryMovePlayer(dx, dy) {
-  if (you.dead) return;
+  if (you.dead) return false;
   if (!isWall(you.x + dx, you.y + dy)
       && entitiesAt(you.x + dx, you.y + dy, 1, 1, null, true).length === 0) {
     you.x += dx;
     you.y += dy;
+    return true;
   }
+  return false;
 }
 
 function affectHealth(delta) {
@@ -723,11 +739,14 @@ function tryMoveEntity(entity, dx, dy, dealDamage) {
     if (dealDamage) {
       affectHealth(-(entity.damage || 0));
     }
+    return false;
   } else if (!isWall(entity.x + dx, entity.y + dy, width, height)
       && entitiesAt(entity.x + dx, entity.y + dy, width, height, entity).length === 0) {
     entity.x += dx;
     entity.y += dy;
+    return true;
   }
+  return false;
 }
 
 // entity update functions //
@@ -780,6 +799,11 @@ var RANDOM_MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 function updateMoveRandom(entity) {
   var delta = choose(RANDOM_MOVES);
   tryMoveEntity(entity, delta[0], delta[1], true);
+}
+
+function updateSlime(entity) {
+  entity.damage = Math.random() < .5 ? 1 : 0;
+  updateMoveRandom(entity);
 }
 
 var CLOSE_DIST = 6;
@@ -842,9 +866,12 @@ function updateGhostMoveTowardsYou(entity) {
   }
 }
 
+var WALL_BREAKER_COOLDOWN = 12;
 function updateWallBreaker(entity) {
   entity.mad = entity.mad || false;
   entity.madCooldown = entity.madCooldown || 0;
+  entity.dirX = entity.dirX || 0;
+  entity.dirY = entity.dirY || 0;
   entity.gfx = entity.mad
     ? [["😡","😡"],
        ["😡","😡"]]
@@ -854,9 +881,68 @@ function updateWallBreaker(entity) {
   var width = entityWidth(entity);
   var height = entityHeight(entity);
   if (entity.mad) {
-  
+    // cruise in a direction, pushing entities maybe, until I hit a wall
+    // then break those walls
+    if (isBorder(entity.x + entity.dirX, entity.y + entity.dirY, width, height)) {
+      entity.mad = false;
+      return;
+    }
+    if (isYou(entity.x + entity.dirX, entity.y + entity.dirY, width, height)) {
+      affectHealth(-(entity.damage || 0));
+      entity.mad = false;
+      return;
+    }
+    var entitiesInTheWay = entitiesAt(entity.x + entity.dirX, entity.y + entity.dirY, width, height, entity);
+    var blocked = false;
+    for (var j  = 0; j < entitiesInTheWay.length; j++) {
+      var other = entitiesInTheWay[j];
+      if (!tryMoveEntity(other, entity.dirX, entity.dirY, true)) {
+        blocked = true;
+      }
+    }
+    if (blocked) {
+      entity.mad = false;
+      return;
+    }
+    // if there are no entities in the way, lets break some walls
+    entity.x += entity.dirX;
+    entity.y += entity.dirY;
+    var hitWall = false;
+    for (var y = entity.y; y < entity.y + height; y++) {
+      for (var x = entity.x; x < entity.x + width; x++) {
+        if (environment[y][x]) {
+          environment[y][x] = null;
+          bg[y][x] = "◽";
+          hitWall = true;
+        }
+      }
+    }
+    if (hitWall) {
+      entity.mad = false;
+    }
   } else {
     entity.madCooldown--;
+    // not on top of you, but you are nearby
+    if (entity.madCooldown <= 0 && !isYou(entity.x, entity.y, width, height)
+        && isYou(entity.x - 3, entity.y - 3, width + 6, height + 6)) {
+      // get mad
+      entity.mad = true;
+      entity.madCooldown = WALL_BREAKER_COOLDOWN;
+      // move towards player. Guaranteed not to be on top of player
+      var delta = [you.x - entity.x, you.y - entity.y];
+      var chanceMoveX = Math.abs(delta[0]) / (Math.abs(delta[0]) + Math.abs(delta[1]));
+      if (Math.random() < chanceMoveX) {
+        entity.dirX = clamp(delta[0], -1, 1);
+        entity.dirY = 0;
+      } else {
+        entity.dirX = 0;
+        entity.dirY = clamp(delta[1], -1, 1);
+      }
+    } else {
+      // rarely wander
+      if (Math.random() < .8) return;
+      updateMoveRandom(entity);
+    }
   }
 }
 
